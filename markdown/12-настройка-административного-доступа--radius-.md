@@ -1,4 +1,4 @@
-# 12. Настройка административного доступа (RADIUS)
+﻿# 12. Настройка административного доступа (RADIUS)
 
 ### Вариант реализации:
 
@@ -28,11 +28,11 @@ systemctl enable --now radiusd
 
   + пример конфигурации файла **/etc/raddb/clients.conf** для любого клиента
 
-![](images/12_image_a4451a6066.png)
+![](../images/12_image_a4451a6066.png)
 
 * Редактируем файл с пользователями **/etc/raddb/users** добавляя в самый конец следующее содержимое:
 
-![](images/12_image__2__110471a752.png)
+![](../images/12_image__2__110471a752.png)
 
 * Перезапускаем службу **radiusd**:
 
@@ -62,16 +62,16 @@ rtr-cod(config)#
 
 * Проверить возможность входа из-под пользователя **netuser** с паролем **P@ssw0rd**:
 
-![](images/12_image__3__f5ad2a3fd7.png)
+![](../images/12_image__3__f5ad2a3fd7.png)
 
 * Проверить вход под локальной учетной записью даже при доступности RADIUS-сервера:
 
-![](images/12_image__4__7ff589c451.png)
+![](../images/12_image__4__7ff589c451.png)
 
 * Проверить доступ по **SSH** из-под пользователя **netuser** с паролем **P@ssw0rd**:
   + например с **srv1-cod**
 
-![](images/12_image__5__d0666d7fbf.png)
+![](../images/12_image__5__d0666d7fbf.png)
 
 #### sw1-cod и sw2-cod (alt-server):
 
@@ -89,15 +89,15 @@ apt-get update && apt-get install -y pam_radius
 
 * Редактируем конфигурационный файл **/etc/pam\_radius\_auth.conf**:
 
-![](images/12_image__6__967e9504e7.png)
+![](../images/12_image__6__967e9504e7.png)
 
 * Редактируем конфигурационный файл **/etc/pam.d/sshd**:
 
-![](images/12_image__8__61bc6848b6.png)
+![](../images/12_image__8__61bc6848b6.png)
 
 * Редактируем конфигурационный файл **/etc/pam.d/system-auth-local**:
 
-![](images/12_image__9__db727aa8fe.png)
+![](../images/12_image__9__db727aa8fe.png)
 
 * Также в случае с **Linux**, данного пользователя необходимо создать локально:
 
@@ -107,11 +107,11 @@ useradd netuser
 
 * Проверить возможность входа из-под пользователя **netuser** с паролем **P@ssw0rd**:
 
-![](images/12_image__10__7ed233963b.png)
+![](../images/12_image__10__7ed233963b.png)
 
 * Проверить доступ по **SSH** из-под пользователя **netuser** с паролем **P@ssw0rd**:
   + например с **srv1-cod**
 
-![](images/12_image__11__a69025f907.png)
+![](../images/12_image__11__a69025f907.png)
 
 Последнее изменение: понедельник, 17 ноября 2025, 13:01
