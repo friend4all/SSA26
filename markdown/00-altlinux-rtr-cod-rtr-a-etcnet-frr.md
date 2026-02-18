@@ -1,19 +1,18 @@
 # Настройка маршрутизаторов rtr-cod и rtr-a на ALT Linux (etcnet + FRR)
 
-> **Альтернативный вариант реализации.** Данная инструкция заменяет пункты 1, 3, 4, 5, 6 основного руководства (EcoRouter) на конфигурацию для ALT Linux с использованием **etcnet** для сетевых настроек и **FRR** для маршрутизации.
+> **Альтернативный вариант реализации.** Данная инструкция заменяет пункты 1, 3, 4, 5, 6, 12 основного руководства (EcoRouter) на конфигурацию для ALT Linux с использованием **etcnet** для сетевых настроек, **FRR** для маршрутизации и **pam_radius** для авторизации.
 
 ---
 
 ## Содержание
 
-1. [Подготовка системы](#1-подготовка-системы)
-2. [rtr-cod: имя хоста и IP-адресация](#2-rtr-cod-имя-хоста-и-ip-адресация)
-3. [rtr-a: имя хоста и IP-адресация](#3-rtr-a-имя-хоста-и-ip-адресация)
-4. [Настройка GRE-туннеля](#4-настройка-gre-туннеля)
-5. [Настройка сетевого экрана (firewalld)](#5-настройка-сетевого-экрана-firewalld)
-6. [Установка и настройка FRR](#6-установка-и-настройка-frr)
-7. [Настройка BGP на rtr-cod](#7-настройка-bgp-на-rtr-cod)
-8. [Настройка OSPF между rtr-cod и rtr-a](#8-настройка-ospf-между-rtr-cod-и-rtr-a)
+1. [rtr-cod: имя хоста и сетевые интерфейсы](#1-rtr-cod-имя-хоста-и-сетевые-интерфейсы)
+2. [rtr-a: имя хоста и сетевые интерфейсы](#2-rtr-a-имя-хоста-и-сетевые-интерфейсы)
+3. [Настройка GRE-туннеля](#3-настройка-gre-туннеля)
+4. [Установка пакетов](#4-установка-пакетов)
+5. [Настройка FRR](#5-настройка-frr)
+6. [Настройка сетевого экрана](#6-настройка-сетевого-экрана)
+7. [Настройка авторизации по RADIUS](#7-настройка-авторизации-по-radius)
 
 ---
 
@@ -25,14 +24,14 @@
 
 | Файл | Назначение |
 |---|---|
-| `options` | Тип интерфейса и параметры (TYPE, BOOTPROTO и т.д.) |
+| `options` | Тип интерфейса и параметры |
 | `ipv4address` | IPv4-адреса (по одному на строку) |
 | `ipv4route` | Статические маршруты |
-| `iplink` | Параметры уровня L2 |
+| `resolv.conf` | DNS-серверы для интерфейса |
 
 ### Имена физических интерфейсов
 
-В зависимости от гипервизора и версии ALT Linux интерфейсы могут называться `eth0`/`eth1` или `ens192`/`ens224`. Определите их командой:
+В зависимости от гипервизора интерфейсы могут называться `eth0`/`eth1` или `ens192`/`ens224`. Определите их командой:
 
 ```bash
 ip link show
@@ -46,43 +45,27 @@ ip link show
 
 ---
 
-## 1. Подготовка системы
+## 1. rtr-cod: имя хоста и сетевые интерфейсы
 
-### Установка необходимых пакетов
+### 1.1. Назначение имени хоста
 
 ```bash
-apt-get update
-apt-get install frr etcnet firewalld
+hostnamectl set-hostname rtr-cod.cod.ssa2026.region
+echo '127.0.0.1 rtr-cod.cod.ssa2026.region rtr-cod' >> /etc/hosts
 ```
 
-### Включение маршрутизации (forwarding)
+### 1.2. Включение маршрутизации (forwarding)
 
-В ALT Linux forwarding контролируется двумя файлами. Необходимо включить в обоих:
+В ALT Linux forwarding по умолчанию отключён в `/etc/net/sysctl.conf`. Перезаписываем файл:
 
 ```bash
 echo 'net.ipv4.ip_forward = 1' > /etc/net/sysctl.conf
 sysctl -p
 ```
 
-> **Важно:** файл `/etc/net/sysctl.conf` по умолчанию содержит `net.ipv4.ip_forward=0` и применяется при перезапуске сети, перезаписывая системный `sysctl.conf`. Поэтому его нужно перезаписать целиком через `echo >`.
+> **Важно:** файл `/etc/net/sysctl.conf` применяется при перезапуске сети и перезаписывает системный `sysctl.conf`. Поэтому его нужно перезаписать целиком через `echo >`.
 
----
-
-## 2. rtr-cod: имя хоста и IP-адресация
-
-### Назначение имени хоста
-
-```bash
-hostnamectl set-hostname rtr-cod.cod.ssa2026.region
-```
-
-Добавьте запись в `/etc/hosts`:
-
-```bash
-echo '127.0.0.1 rtr-cod.cod.ssa2026.region rtr-cod' >> /etc/hosts
-```
-
-### Настройка интерфейса ens192
+### 1.3. Настройка интерфейса ens192
 
 > **ens192** — внешний интерфейс, обращён в сторону машины **ISP**
 
@@ -102,7 +85,7 @@ TYPE=eth
 178.207.179.4/29
 ```
 
-### Настройка интерфейса ens224
+### 1.4. Настройка интерфейса ens224
 
 > **ens224** — внутренний интерфейс, обращён в сторону машины **fw-cod**
 
@@ -122,34 +105,65 @@ TYPE=eth
 172.16.1.1/30
 ```
 
-### Применение настроек
+Статические маршруты к внутренним сетям COD (через fw-cod).
+
+`/etc/net/ifaces/ens224/ipv4route`:
+
+```
+192.168.10.0/24 via 172.16.1.2
+192.168.30.0/24 via 172.16.1.2
+192.168.40.0/24 via 172.16.1.2
+192.168.50.0/24 via 172.16.1.2
+```
+
+> Сеть 192.168.20.0/24 (VLAN DATA) **не маршрутизируется** по условиям задания.
+
+### 1.5. Временный DNS и маршрут по умолчанию
+
+Для установки пакетов нужен доступ в Интернет. Маршрут по умолчанию rtr-cod получит по BGP позже, поэтому временно задаём его статически:
+
+```bash
+echo 'nameserver 100.100.100.100' > /etc/resolv.conf
+```
+
+`/etc/net/ifaces/ens192/ipv4route`:
+
+```
+default via 178.207.179.1
+```
+
+### 1.6. Применение и проверка
 
 ```bash
 systemctl restart network
 ```
 
-### Проверка
-
 ```bash
 ip addr show ens192
 ip addr show ens224
 ping -c 3 178.207.179.1
+ping -c 3 ya.ru
 ```
-
-> Маршрут по умолчанию на rtr-cod **не задаётся** вручную — он будет получен по BGP.
 
 ---
 
-## 3. rtr-a: имя хоста и IP-адресация
+## 2. rtr-a: имя хоста и сетевые интерфейсы
 
-### Назначение имени хоста
+### 2.1. Назначение имени хоста
 
 ```bash
 hostnamectl set-hostname rtr-a.office.ssa2026.region
 echo '127.0.0.1 rtr-a.office.ssa2026.region rtr-a' >> /etc/hosts
 ```
 
-### Настройка интерфейса ens192
+### 2.2. Включение маршрутизации (forwarding)
+
+```bash
+echo 'net.ipv4.ip_forward = 1' > /etc/net/sysctl.conf
+sysctl -p
+```
+
+### 2.3. Настройка интерфейса ens192
 
 > **ens192** — внешний интерфейс, обращён в сторону машины **ISP**
 
@@ -169,7 +183,7 @@ TYPE=eth
 178.207.179.28/29
 ```
 
-### Маршрут по умолчанию
+### 2.4. Маршрут по умолчанию и DNS
 
 `/etc/net/ifaces/ens192/ipv4route`:
 
@@ -177,11 +191,13 @@ TYPE=eth
 default via 178.207.179.25
 ```
 
-### Настройка VLAN-интерфейсов на ens224
+```bash
+echo 'nameserver 100.100.100.100' > /etc/resolv.conf
+```
+
+### 2.5. Настройка VLAN-интерфейсов на ens224
 
 > **ens224** — внутренний интерфейс, обращён в сторону коммутаторов **sw1-a** и **sw2-a**
-
-На rtr-a вместо одного интерфейса создаются VLAN-подинтерфейсы для маршрутизации между VLAN.
 
 Создаём базовый интерфейс:
 
@@ -264,13 +280,11 @@ VID=300
 172.20.30.254/24
 ```
 
-### Применение настроек
+### 2.6. Применение и проверка
 
 ```bash
 systemctl restart network
 ```
-
-### Проверка
 
 ```bash
 ip addr show
@@ -278,11 +292,12 @@ ip -d link show ens224.100
 ip -d link show ens224.200
 ip -d link show ens224.300
 ping -c 3 178.207.179.25
+ping -c 3 ya.ru
 ```
 
 ---
 
-## 4. Настройка GRE-туннеля
+## 3. Настройка GRE-туннеля
 
 GRE-туннель между rtr-cod и rtr-a настраивается через etcnet.
 
@@ -364,100 +379,31 @@ ping -c 3 10.10.10.1
 
 ---
 
-## 5. Настройка сетевого экрана (firewalld)
+## 4. Установка пакетов
 
-### Включение firewalld (на обоих роутерах)
+> Сеть уже настроена и доступ в Интернет есть — можно устанавливать пакеты.
 
-```bash
-systemctl enable --now firewalld
-```
-
-### rtr-cod: зоны и NAT
-
-Внешний интерфейс (ISP) добавляем в зону **external** (masquerade включён по умолчанию), разрешаем GRE:
+### На rtr-cod (FRR + firewalld + RADIUS)
 
 ```bash
-firewall-cmd --zone=external --add-interface=ens192 --permanent
-firewall-cmd --zone=external --add-protocol=gre --permanent
+apt-get update
+apt-get install -y frr firewalld pam_radius
 ```
 
-Все остальные интерфейсы добавляем в зону **trusted**:
+### На rtr-a (FRR + firewalld + RADIUS)
 
 ```bash
-firewall-cmd --zone=trusted --add-interface=ens224 --permanent
-firewall-cmd --zone=trusted --add-interface=tun0 --permanent
-```
-
-Применяем:
-
-```bash
-firewall-cmd --reload
-```
-
-Статические маршруты к внутренним сетям COD (через fw-cod).
-
-Добавьте в `/etc/net/ifaces/ens224/ipv4route`:
-
-```
-192.168.10.0/24 via 172.16.1.2
-192.168.30.0/24 via 172.16.1.2
-192.168.40.0/24 via 172.16.1.2
-192.168.50.0/24 via 172.16.1.2
-```
-
-> Сеть 192.168.20.0/24 (VLAN DATA) **не маршрутизируется** по условиям задания.
-
-### rtr-a: зоны и NAT
-
-```bash
-firewall-cmd --zone=external --add-interface=ens192 --permanent
-firewall-cmd --zone=external --add-protocol=gre --permanent
-
-firewall-cmd --zone=trusted --add-interface=ens224 --permanent
-firewall-cmd --zone=trusted --add-interface=ens224.100 --permanent
-firewall-cmd --zone=trusted --add-interface=ens224.200 --permanent
-firewall-cmd --zone=trusted --add-interface=ens224.300 --permanent
-firewall-cmd --zone=trusted --add-interface=tun0 --permanent
-
-firewall-cmd --reload
-```
-
-### Проверка firewalld
-
-```bash
-firewall-cmd --get-active-zones
-firewall-cmd --zone=external --list-all
-firewall-cmd --zone=trusted --list-all
-```
-
-### Проверка NAT
-
-С fw-cod (после назначения временного маршрута):
-
-```bash
-ip route add 0.0.0.0/0 via 172.16.1.1
-ping -c 3 8.8.8.8
-```
-
-На rtr-cod проверка таблицы трансляции:
-
-```bash
-conntrack -L
+apt-get update
+apt-get install -y frr firewalld pam_radius
 ```
 
 ---
 
-## 6. Установка и настройка FRR
+## 5. Настройка FRR
 
-### Установка (на обоих роутерах)
+### 5.1. Включение демонов
 
-```bash
-apt-get install frr
-```
-
-### Включение демонов
-
-Отредактируйте `/etc/frr/daemons` — включите нужные демоны:
+Отредактируйте `/etc/frr/daemons`:
 
 На **rtr-cod** (BGP + OSPF):
 
@@ -474,24 +420,13 @@ zebra=yes
 ospfd=yes
 ```
 
-### Запуск FRR
+### 5.2. Запуск FRR (на обоих роутерах)
 
 ```bash
-systemctl enable frr
-systemctl start frr
+systemctl enable --now frr
 ```
 
-### Вход в консоль FRR
-
-```bash
-vtysh
-```
-
----
-
-## 7. Настройка BGP на rtr-cod
-
-Через `vtysh` на rtr-cod:
+### 5.3. Настройка BGP на rtr-cod
 
 ```bash
 vtysh
@@ -513,33 +448,22 @@ write memory
 exit
 ```
 
-### Проверка BGP
+Проверка BGP:
 
 ```bash
 vtysh -c "show ip bgp summary"
-```
-
-Убедитесь, что состояние соседа `178.207.179.1` — `Established`.
-
-Проверка маршрута по умолчанию (должен быть получен по BGP):
-
-```bash
 vtysh -c "show ip route"
 ```
 
-Проверка доступа в Интернет:
+Убедитесь, что маршрут по умолчанию получен по BGP. После этого **удалите временный статический маршрут**:
+
+Удалите строку `default via 178.207.179.1` из файла `/etc/net/ifaces/ens192/ipv4route`:
 
 ```bash
-ping -c 3 8.8.8.8
+echo -n > /etc/net/ifaces/ens192/ipv4route
 ```
 
----
-
-## 8. Настройка OSPF между rtr-cod и rtr-a
-
-### rtr-cod: OSPF
-
-Через `vtysh`:
+### 5.4. Настройка OSPF на rtr-cod
 
 ```bash
 vtysh
@@ -569,9 +493,7 @@ write memory
 exit
 ```
 
-### rtr-a: OSPF
-
-Через `vtysh`:
+### 5.5. Настройка OSPF на rtr-a
 
 ```bash
 vtysh
@@ -608,7 +530,7 @@ write memory
 exit
 ```
 
-### Проверка OSPF (на обоих роутерах)
+### 5.6. Проверка OSPF (на обоих роутерах)
 
 ```bash
 vtysh -c "show ip ospf neighbor"
@@ -628,6 +550,126 @@ ping -c 3 172.20.10.254
 
 # С rtr-a
 ping -c 3 172.16.1.1
+```
+
+### 5.7. Замена DNS на постоянный
+
+После того как OSPF заработает и появится связность с srv1-cod, замените временный DNS:
+
+```bash
+echo 'nameserver <IP_srv1-cod>' > /etc/resolv.conf
+```
+
+---
+
+## 6. Настройка сетевого экрана
+
+> Настройка выполняется через **firewalld**. Зона **external** включает masquerade по умолчанию.
+
+### 6.1. Включение firewalld (на обоих роутерах)
+
+```bash
+systemctl enable --now firewalld
+```
+
+### 6.2. rtr-cod: зоны
+
+> **ens192** (ISP) → зона **external** (masquerade), разрешить GRE
+> **ens224** (fw-cod) и **tun0** (туннель) → зона **trusted**
+
+```bash
+firewall-cmd --zone=external --add-interface=ens192 --permanent
+firewall-cmd --zone=external --add-protocol=gre --permanent
+
+firewall-cmd --zone=trusted --add-interface=ens224 --permanent
+firewall-cmd --zone=trusted --add-interface=tun0 --permanent
+
+firewall-cmd --reload
+```
+
+### 6.3. rtr-a: зоны
+
+> **ens192** (ISP) → зона **external** (masquerade), разрешить GRE
+> **ens224**, VLAN-интерфейсы и **tun0** → зона **trusted**
+
+```bash
+firewall-cmd --zone=external --add-interface=ens192 --permanent
+firewall-cmd --zone=external --add-protocol=gre --permanent
+
+firewall-cmd --zone=trusted --add-interface=ens224 --permanent
+firewall-cmd --zone=trusted --add-interface=ens224.100 --permanent
+firewall-cmd --zone=trusted --add-interface=ens224.200 --permanent
+firewall-cmd --zone=trusted --add-interface=ens224.300 --permanent
+firewall-cmd --zone=trusted --add-interface=tun0 --permanent
+
+firewall-cmd --reload
+```
+
+### 6.4. Проверка
+
+```bash
+firewall-cmd --get-active-zones
+firewall-cmd --zone=external --list-all
+firewall-cmd --zone=trusted --list-all
+```
+
+Проверка NAT — с fw-cod (после назначения временного маршрута):
+
+```bash
+ip route add 0.0.0.0/0 via 172.16.1.1
+ping -c 3 8.8.8.8
+```
+
+На rtr-cod проверка трансляции:
+
+```bash
+conntrack -L
+```
+
+---
+
+## 7. Настройка авторизации по RADIUS
+
+> RADIUS-сервер настраивается на **srv1-cod** (см. инструкцию 12). Здесь описана только клиентская часть на роутерах.
+
+### 7.1. Настройка pam_radius (на обоих роутерах)
+
+Пакет `pam_radius` уже установлен (шаг 4).
+
+Создайте локального пользователя:
+
+```bash
+useradd netuser
+```
+
+Отредактируйте `/etc/pam_radius_auth.conf` — укажите RADIUS-сервер и общий секрет:
+
+```
+192.168.10.1    P@ssw0rd    3
+```
+
+> `192.168.10.1` — IP-адрес srv1-cod (RADIUS-сервер), `P@ssw0rd` — общий секрет, `3` — таймаут в секундах.
+
+### 7.2. Настройка PAM для SSH
+
+Отредактируйте `/etc/pam.d/sshd` — добавьте в начало файла (перед остальными строками `auth`):
+
+```
+auth sufficient pam_radius_auth.so
+```
+
+Отредактируйте `/etc/pam.d/system-auth-local` — добавьте:
+
+```
+auth sufficient pam_radius_auth.so
+```
+
+### 7.3. Проверка
+
+Проверьте вход по SSH под пользователем **netuser** с паролем **P@ssw0rd** (например, с srv1-cod):
+
+```bash
+ssh netuser@<IP_роутера>
 ```
 
 ---
