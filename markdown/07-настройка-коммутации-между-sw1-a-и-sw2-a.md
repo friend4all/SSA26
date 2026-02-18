@@ -35,10 +35,14 @@ vim /etc/sysconfig/network
   + тегированный подинтерфейс с IP-адресом из подсети для **vlan300**, а также шлюзом по умолчанию и DNS
 
 ```bash
-ip link add link ens19 name ens19.300 type vlan id 300
-ip link set dev ens19.300 up
-ip addr add 172.20.30.1/24 dev ens19.300
-ip route add 0.0.0.0/0 via 172.20.30.254
+ip link add link ens19 name ens19.300 type vlan id 300
+
+ip link set dev ens19.300 up
+
+ip addr add 172.20.30.1/24 dev ens19.300
+
+ip route add 0.0.0.0/0 via 172.20.30.254
+
 echo "nameserver 77.88.8.8" > /etc/resolv.conf
 ```
 
@@ -133,10 +137,14 @@ ovs-vsctl add-port br0 ens21
   + тегированный подинтерфейс с IP-адресом из подсети для **vlan300**, а также шлюзом по умолчанию и DNS
 
 ```bash
-ip link add link ens19 name ens19.300 type vlan id 300
-ip link set dev ens19.300 up
-ip addr add 172.20.30.2/24 dev ens19.300
-ip route add 0.0.0.0/0 via 172.20.30.254
+ip link add link ens19 name ens19.300 type vlan id 300
+
+ip link set dev ens19.300 up
+
+ip addr add 172.20.30.2/24 dev ens19.300
+
+ip route add 0.0.0.0/0 via 172.20.30.254
+
 echo "nameserver 77.88.8.8" > /etc/resolv.conf
 ```
 

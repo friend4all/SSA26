@@ -90,10 +90,14 @@ vim /etc/sysconfig/network
 * Временно на базе интерфейса в сторону **fw-cod** создадим подинтерфейс с указанием **vlan300** для дальнейшей установки пакета **openvswitch**:
 
 ```bash
-ip link add link ens19 name ens19.300 type vlan id 300
-ip link set dev ens19.300 up
-ip addr add 192.168.30.1/24 dev ens19.300
-ip route add 0.0.0.0/0 via 192.168.30.254
+ip link add link ens19 name ens19.300 type vlan id 300
+
+ip link set dev ens19.300 up
+
+ip addr add 192.168.30.1/24 dev ens19.300
+
+ip route add 0.0.0.0/0 via 192.168.30.254
+
 echo "nameserver 77.88.8.8" > /etc/resolv.conf
 ```
 
@@ -153,11 +157,16 @@ ovs-vsctl add-port br0 ens21
   + тегированный подинтерфейс с IP-адресом из подсети для **vlan300**, а также шлюзом по умолчанию и DNS
 
 ```bash
-ip link add link ens19 name ens19.300 type vlan id 300
-ip link set up ens19
-ip link set up ens19.300
-ip addr add 192.168.30.2/24 dev ens19.300
-ip route add 0.0.0.0/0 via 192.168.30.254
+ip link add link ens19 name ens19.300 type vlan id 300
+
+ip link set up ens19
+
+ip link set up ens19.300
+
+ip addr add 192.168.30.2/24 dev ens19.300
+
+ip route add 0.0.0.0/0 via 192.168.30.254
+
 echo "nameserver 77.88.8.8" > /etc/resolv.conf
 ```
 

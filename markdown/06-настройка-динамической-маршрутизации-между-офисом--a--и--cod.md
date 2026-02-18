@@ -11,7 +11,8 @@
 * Перейдите в режим конфигурирования протокола с помощью команды **router ospf <номер процесса>**, где номер в пределах <0-65535> в режиме глобальной конфигурации:
 
 ```bash
-rtr-cod(config)#router ospf 1
+rtr-cod(config)#router ospf 1
+
 rtr-cod(config-router)#
 ```
 
@@ -19,21 +20,26 @@ rtr-cod(config-router)#
   + Используйте команду **ospf router-id <значение>,** в качестве значения укажем туннельный IP-адрес маршрутизатора:
 
 ```bash
-rtr-cod(config-router)#router-id 10.10.10.1
+rtr-cod(config-router)#router-id 10.10.10.1
+
 rtr-cod(config-router)#
 ```
 
 * Переводим все интерфейсы в пассивный режим:
 
 ```bash
-rtr-cod(config-router)#passive-interface default 
+rtr-cod(config-router)#passive-interface default 
+
 rtr-cod(config-router)#
 ```
+
+> **tunnel.0** — GRE-туннель, единственный активный OSPF-интерфейс
 
 * Исключаем интерфейс **tunnel.0** из пассивного режима для установления соседства и дальнейшего обмена маршрутной информацией:
 
 ```bash
-rtr-cod(config-router)#no passive-interface tunnel.0 
+rtr-cod(config-router)#no passive-interface tunnel.0 
+
 rtr-cod(config-router)#
 ```
 
@@ -41,23 +47,34 @@ rtr-cod(config-router)#
   + импортировав (**redistribute**) ранее указанные статические маршруты (до локальных сетей COD-а) в процесс OSPF
 
 ```bash
-rtr-cod(config-router)#redistribute static 
-rtr-cod(config-router)#network 10.10.10.0/30 area 0
-rtr-cod(config-router)#network 172.16.1.0/30 area 0
-rtr-cod(config-router)#exit
+rtr-cod(config-router)#redistribute static 
+
+rtr-cod(config-router)#network 10.10.10.0/30 area 0
+
+rtr-cod(config-router)#network 172.16.1.0/30 area 0
+
+rtr-cod(config-router)#exit
+
 rtr-cod(config)#
 ```
 
 * Обеспечиваем защиту протокола маршрутизации посредством парольной защиты:
 
 ```bash
-rtr-cod(config)#interface tunnel.0
-rtr-cod(config-if-tunnel)#ip ospf authentication message-digest 
-rtr-cod(config-if-tunnel)#ip ospf message-digest-key 1 md5 P@ssw0rd
-rtr-cod(config-if-tunnel)#exit
-rtr-cod(config)#write memory
-Building configuration...
-
+rtr-cod(config)#interface tunnel.0
+
+rtr-cod(config-if-tunnel)#ip ospf authentication message-digest 
+
+rtr-cod(config-if-tunnel)#ip ospf message-digest-key 1 md5 P@ssw0rd
+
+rtr-cod(config-if-tunnel)#exit
+
+rtr-cod(config)#write memory
+
+Building configuration...
+
+
+
 rtr-cod(config)#
 ```
 

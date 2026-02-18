@@ -16,14 +16,22 @@
   5. сохраняем конфигурацию **(write memory).**
 
 ```bash
-ecorouter>enable
-ecorouter#configure terminal 
-Enter configuration commands, one per line.  End with CNTL/Z.
-ecorouter(config)#hostname rtr-cod
-rtr-cod(config)#ip domain-name cod.ssa2026.region
-rtr-cod(config)#write memory
-Building configuration...
-
+ecorouter>enable
+
+ecorouter#configure terminal 
+
+Enter configuration commands, one per line.  End with CNTL/Z.
+
+ecorouter(config)#hostname rtr-cod
+
+rtr-cod(config)#ip domain-name cod.ssa2026.region
+
+rtr-cod(config)#write memory
+
+Building configuration...
+
+
+
 rtr-cod(config)#
 ```
 
@@ -56,23 +64,35 @@ rtr-cod(config)#
 
 ![](../images/01_image__4__24ad4126be.png)
 
+> **isp** — внешний интерфейс (L3), подключение к провайдеру **ISP**
+
 * Создадим интерфейс с именем **isp** и назначим на него IP-адрес **178.207.179.4/29**, также зададим для данного интерфейса описание (description - опциональный, необязательный параметр):
 
 ```bash
-rtr-cod(config)#interface isp
-rtr-cod(config-if)#ip address 178.207.179.4/29
-rtr-cod(config-if)#description "Connecting to an ISP provider"
-rtr-cod(config-if)#exit
+rtr-cod(config)#interface isp
+
+rtr-cod(config-if)#ip address 178.207.179.4/29
+
+rtr-cod(config-if)#description "Connecting to an ISP provider"
+
+rtr-cod(config-if)#exit
+
 rtr-cod(config)#
 ```
+
+> **fw-cod** — внутренний интерфейс (L3), подключение к межсетевому экрану **fw-cod**
 
 * Создадим интерфейс с именем **fw-cod** и назначим на него IP-адрес **172.16.1.1/30**, также зададим для данного интерфейса описание (description - опциональный, необязательный параметр):
 
 ```bash
-rtr-cod(config)#interface fw-cod
-rtr-cod(config-if)#ip address 172.16.1.1/30
-rtr-cod(config-if)#description "Connecting to fw-cod"
-rtr-cod(config-if)#exit
+rtr-cod(config)#interface fw-cod
+
+rtr-cod(config-if)#ip address 172.16.1.1/30
+
+rtr-cod(config-if)#description "Connecting to fw-cod"
+
+rtr-cod(config-if)#exit
+
 rtr-cod(config)#
 ```
 
@@ -81,33 +101,51 @@ rtr-cod(config)#
 
 ![](../images/01_image__3__b218c6ca11.png)
 
+> **te0** — внешний порт, обращён в сторону машины **ISP**
+
 * В режиме конфигурирования порта **te0** необходимо создать **service-instance** с произвольным именем, например **te0/isp**:
   + также необходимо указать (инкапсулировать) что будет обрабатываться не тегированный трафик (**untagget**);
   + и указать в какой интерфейс (ранее созданный с именем **isp**) нужно отправлять обработанные кадры.
 
 ```bash
-rtr-cod(config)#port te0
-rtr-cod(config-port)#service-instance te0/isp
-rtr-cod(config-service-instance)#encapsulation untagged 
-rtr-cod(config-service-instance)#connect ip interface isp 
-rtr-cod(config-service-instance)#exit
-rtr-cod(config-port)#exit
+rtr-cod(config)#port te0
+
+rtr-cod(config-port)#service-instance te0/isp
+
+rtr-cod(config-service-instance)#encapsulation untagged 
+
+rtr-cod(config-service-instance)#connect ip interface isp 
+
+rtr-cod(config-service-instance)#exit
+
+rtr-cod(config-port)#exit
+
 rtr-cod(config)#
 ```
+
+> **te1** — внутренний порт, обращён в сторону машины **fw-cod**
 
 * В режиме конфигурирования порта **te1** необходимо создать **service-instance** с произвольным именем, например **te1/fw-cod**:
   + также необходимо указать (инкапсулировать) что будет обрабатываться не тегированный трафик (**untagget**);
   + и указать в какой интерфейс (ранее созданный с именем **fw-cod**) нужно отправлять обработанные кадры.
 
 ```bash
-rtr-cod(config-port)#service-instance te1/fw-cod
-rtr-cod(config-service-instance)#encapsulation untagged 
-rtr-cod(config-service-instance)#connect ip interface fw-cod 
-rtr-cod(config-service-instance)#exit
-rtr-cod(config-port)#exit
-rtr-cod(config)# write memory
-Building configuration...
-
+rtr-cod(config-port)#service-instance te1/fw-cod
+
+rtr-cod(config-service-instance)#encapsulation untagged 
+
+rtr-cod(config-service-instance)#connect ip interface fw-cod 
+
+rtr-cod(config-service-instance)#exit
+
+rtr-cod(config-port)#exit
+
+rtr-cod(config)# write memory
+
+Building configuration...
+
+
+
 rtr-cod(config)#
 ```
 
@@ -157,7 +195,8 @@ rtr-cod(config)#
   + с помощью команды **ip route <IP\_NETWORK/PREFIX> <NEXTHOP\_IP\_ADDRESS>** задаём маршут по умолчанию (шлюз)
 
 ```bash
-rtr-a(config)#ip route 0.0.0.0/0 178.207.179.25
+rtr-a(config)#ip route 0.0.0.0/0 178.207.179.25
+
 rtr-a(config)#
 ```
 
@@ -170,23 +209,39 @@ rtr-a(config)#
 ![](../images/01_image__13__511b961235.png)
 
 * Реализуем создание под-интерфейсов для дальнейшем маршрутизации между VLAN-ами:
+> **vl100** — VLAN 100 (SRV), 172.20.10.0/24 | **vl200** — VLAN 200 (CLI), 172.20.20.0/24 | **vl300** — VLAN 300 (MGMT), 172.20.30.0/24
+
   + Создаём интерфейсы с произвольными именами для каждого VLAN-а и назначаем на них IP-адреса:
 
 ```bash
-rtr-a(config)#interface vl100
-rtr-a(config-if)#ip address 172.20.10.254/24
-rtr-a(config-if)#description "VLAN - SRV"
-rtr-a(config-if)#exit
-rtr-a(config)#
-rtr-a(config)#interface vl200
-rtr-a(config-if)#ip address 172.20.20.254/24
-rtr-a(config-if)#description "VLAN - CLI"
-rtr-a(config-if)#exit
-rtr-a(config)#
-rtr-a(config)#interface vl300
-rtr-a(config-if)#ip address 172.20.30.254/24
-rtr-a(config-if)#description "VLAN - MGMT"
-rtr-a(config-if)#exit
+rtr-a(config)#interface vl100
+
+rtr-a(config-if)#ip address 172.20.10.254/24
+
+rtr-a(config-if)#description "VLAN - SRV"
+
+rtr-a(config-if)#exit
+
+rtr-a(config)#
+
+rtr-a(config)#interface vl200
+
+rtr-a(config-if)#ip address 172.20.20.254/24
+
+rtr-a(config-if)#description "VLAN - CLI"
+
+rtr-a(config-if)#exit
+
+rtr-a(config)#
+
+rtr-a(config)#interface vl300
+
+rtr-a(config-if)#ip address 172.20.30.254/24
+
+rtr-a(config-if)#description "VLAN - MGMT"
+
+rtr-a(config-if)#exit
+
 rtr-a(config)#
 ```
 
@@ -194,6 +249,8 @@ rtr-a(config)#
   + созданные интрфейсы пока не добавлены в какие-либо **Service instance**, а значит не привязаны и к порту, отсюда и статус **down**
 
 ![](../images/01_image__14__a338a1c0fb.png)
+
+> **te1** — внутренний порт, обращён в сторону коммутаторов **sw1-a** / **sw2-a**
 
 * + на базе физического интерфейса **te1** для каждого VLAN-а создаём **service-instance** с инкапсуляцией соответствующих тегов (**VID**) и подключением необходимых интерфейсов:
 
@@ -212,29 +269,52 @@ rtr-a(config)#
   + ключ **1** показывает, что снимаем только одну, верхнюю метку, на L3 кадр должен поступать без признаков VLAN
 
 ```bash
-rtr-a(config)#port te1
-rtr-a(config-port)#service-instance te1/vl100
-rtr-a(config-service-instance)#encapsulation dot1q 100
-rtr-a(config-service-instance)#rewrite pop 1
-rtr-a(config-service-instance)#connect in
-rtr-a(config-service-instance)#connect ip interface vl100                   
-rtr-a(config-service-instance)#exit
-rtr-a(config-port)#
-rtr-a(config-port)#service-instance te1/vl200
-rtr-a(config-service-instance)#encapsulation dot1q 200
-rtr-a(config-service-instance)#rewrite pop 1
-rtr-a(config-service-instance)#connect ip interface vl200 
-rtr-a(config-service-instance)#exit
-rtr-a(config-port)#
-rtr-a(config-port)#service-instance te1/vl300
-rtr-a(config-service-instance)#encapsulation dot1q 300
-rtr-a(config-service-instance)#rewrite pop 1
-rtr-a(config-service-instance)#connect ip interface vl300 
-rtr-a(config-service-instance)#exit
-rtr-a(config-port)#exit
-rtr-a(config)#write memory
-Building configuration...
-
+rtr-a(config)#port te1
+
+rtr-a(config-port)#service-instance te1/vl100
+
+rtr-a(config-service-instance)#encapsulation dot1q 100
+
+rtr-a(config-service-instance)#rewrite pop 1
+
+rtr-a(config-service-instance)#connect in
+
+rtr-a(config-service-instance)#connect ip interface vl100                   
+
+rtr-a(config-service-instance)#exit
+
+rtr-a(config-port)#
+
+rtr-a(config-port)#service-instance te1/vl200
+
+rtr-a(config-service-instance)#encapsulation dot1q 200
+
+rtr-a(config-service-instance)#rewrite pop 1
+
+rtr-a(config-service-instance)#connect ip interface vl200 
+
+rtr-a(config-service-instance)#exit
+
+rtr-a(config-port)#
+
+rtr-a(config-port)#service-instance te1/vl300
+
+rtr-a(config-service-instance)#encapsulation dot1q 300
+
+rtr-a(config-service-instance)#rewrite pop 1
+
+rtr-a(config-service-instance)#connect ip interface vl300 
+
+rtr-a(config-service-instance)#exit
+
+rtr-a(config-port)#exit
+
+rtr-a(config)#write memory
+
+Building configuration...
+
+
+
 rtr-a(config)#
 ```
 

@@ -8,28 +8,39 @@
 
 ##### Настройка туннеля GRE между устройствами:
 
+> **tunnel.0** — GRE-туннель до **rtr-a**, используется для OSPF-соседства между офисами
+
+> **tunnel.0** — GRE-туннель до **rtr-a**, используется для OSPF-соседства между офисами
+
 * Создайте интерфейс туннеля c именем **tunnel.0**:
 
 ```bash
-rtr-cod(config)#interface tunnel.0
+rtr-cod(config)#interface tunnel.0
+
 rtr-cod(config-if-tunnel)#
 ```
 
 * Назначьте ip адрес в соответствие с требования задания:
 
 ```bash
-rtr-cod(config-if-tunnel)#ip address 10.10.10.1/30
+rtr-cod(config-if-tunnel)#ip address 10.10.10.1/30
+
 rtr-cod(config-if-tunnel)#
 ```
 
 * Задайте режим работы туннеля GRE и адресов начала (источника - **rtr-cod**) и конца туннеля (назначения - **rtr-a**):
 
 ```bash
-rtr-cod(config-if-tunnel)#ip tunnel 178.207.179.4 178.207.179.28 mode gre
-rtr-cod(config-if-tunnel)# exit
-rtr-cod(config)#write memory
-Building configuration...
-
+rtr-cod(config-if-tunnel)#ip tunnel 178.207.179.4 178.207.179.28 mode gre
+
+rtr-cod(config-if-tunnel)# exit
+
+rtr-cod(config)#write memory
+
+Building configuration...
+
+
+
 rtr-cod(config)#
 ```
 
@@ -40,6 +51,8 @@ rtr-cod(config)#
 #### **rtr-a (ecorouter):**
 
 ##### Настройка туннеля GRE между устройствами:
+
+> **tunnel.0** — GRE-туннель до **rtr-cod**, используется для OSPF-соседства между офисами
 
 * Реализация аналогично **rtr-cod**, за исключением соответствующего IP-адресов **источника** и **назначения**:
   + состояния туннеля должно быть:

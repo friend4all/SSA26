@@ -10,7 +10,7 @@
 2. [rtr-cod: имя хоста и IP-адресация](#2-rtr-cod-имя-хоста-и-ip-адресация)
 3. [rtr-a: имя хоста и IP-адресация](#3-rtr-a-имя-хоста-и-ip-адресация)
 4. [Настройка GRE-туннеля](#4-настройка-gre-туннеля)
-5. [Настройка NAT (masquerade)](#5-настройка-nat-masquerade)
+5. [Настройка сетевого экрана (firewalld)](#5-настройка-сетевого-экрана-firewalld)
 6. [Установка и настройка FRR](#6-установка-и-настройка-frr)
 7. [Настройка BGP на rtr-cod](#7-настройка-bgp-на-rtr-cod)
 8. [Настройка OSPF между rtr-cod и rtr-a](#8-настройка-ospf-между-rtr-cod-и-rtr-a)
@@ -52,15 +52,19 @@ ip link show
 
 ```bash
 apt-get update
-apt-get install frr etcnet iptables
+apt-get install frr etcnet firewalld
 ```
 
 ### Включение маршрутизации (forwarding)
 
+В ALT Linux forwarding контролируется двумя файлами. Необходимо включить в обоих:
+
 ```bash
-echo 'net.ipv4.ip_forward = 1' >> /etc/sysctl.conf
+echo 'net.ipv4.ip_forward = 1' > /etc/net/sysctl.conf
 sysctl -p
 ```
+
+> **Важно:** файл `/etc/net/sysctl.conf` по умолчанию содержит `net.ipv4.ip_forward=0` и применяется при перезапуске сети, перезаписывая системный `sysctl.conf`. Поэтому его нужно перезаписать целиком через `echo >`.
 
 ---
 
@@ -69,16 +73,18 @@ sysctl -p
 ### Назначение имени хоста
 
 ```bash
-hostnamectl set-hostname rtr-cod
+hostnamectl set-hostname rtr-cod.cod.ssa2026.region
 ```
 
-Для назначения доменного имени добавьте запись в `/etc/hosts`:
+Добавьте запись в `/etc/hosts`:
 
 ```bash
 echo '127.0.0.1 rtr-cod.cod.ssa2026.region rtr-cod' >> /etc/hosts
 ```
 
-### Настройка интерфейса ens192 (ISP, аналог te0)
+### Настройка интерфейса ens192
+
+> **ens192** — внешний интерфейс, обращён в сторону машины **ISP**
 
 ```bash
 mkdir -p /etc/net/ifaces/ens192
@@ -88,9 +94,6 @@ mkdir -p /etc/net/ifaces/ens192
 
 ```
 TYPE=eth
-BOOTPROTO=static
-ONBOOT=yes
-CONFIG_IPV4=yes
 ```
 
 `/etc/net/ifaces/ens192/ipv4address`:
@@ -99,7 +102,9 @@ CONFIG_IPV4=yes
 178.207.179.4/29
 ```
 
-### Настройка интерфейса ens224 (fw-cod, аналог te1)
+### Настройка интерфейса ens224
+
+> **ens224** — внутренний интерфейс, обращён в сторону машины **fw-cod**
 
 ```bash
 mkdir -p /etc/net/ifaces/ens224
@@ -109,9 +114,6 @@ mkdir -p /etc/net/ifaces/ens224
 
 ```
 TYPE=eth
-BOOTPROTO=static
-ONBOOT=yes
-CONFIG_IPV4=yes
 ```
 
 `/etc/net/ifaces/ens224/ipv4address`:
@@ -143,11 +145,13 @@ ping -c 3 178.207.179.1
 ### Назначение имени хоста
 
 ```bash
-hostnamectl set-hostname rtr-a
-echo '127.0.0.1 rtr-a.a.ssa2026.region rtr-a' >> /etc/hosts
+hostnamectl set-hostname rtr-a.office.ssa2026.region
+echo '127.0.0.1 rtr-a.office.ssa2026.region rtr-a' >> /etc/hosts
 ```
 
-### Настройка интерфейса ens192 (ISP, аналог te0)
+### Настройка интерфейса ens192
+
+> **ens192** — внешний интерфейс, обращён в сторону машины **ISP**
 
 ```bash
 mkdir -p /etc/net/ifaces/ens192
@@ -157,9 +161,6 @@ mkdir -p /etc/net/ifaces/ens192
 
 ```
 TYPE=eth
-BOOTPROTO=static
-ONBOOT=yes
-CONFIG_IPV4=yes
 ```
 
 `/etc/net/ifaces/ens192/ipv4address`:
@@ -176,7 +177,9 @@ CONFIG_IPV4=yes
 default via 178.207.179.25
 ```
 
-### Настройка VLAN-интерфейсов на ens224 (аналог te1)
+### Настройка VLAN-интерфейсов на ens224
+
+> **ens224** — внутренний интерфейс, обращён в сторону коммутаторов **sw1-a** и **sw2-a**
 
 На rtr-a вместо одного интерфейса создаются VLAN-подинтерфейсы для маршрутизации между VLAN.
 
@@ -190,8 +193,6 @@ mkdir -p /etc/net/ifaces/ens224
 
 ```
 TYPE=eth
-BOOTPROTO=static
-ONBOOT=yes
 ```
 
 #### VLAN 100 (SRV)
@@ -287,6 +288,8 @@ GRE-туннель между rtr-cod и rtr-a настраивается чер
 
 ### rtr-cod: туннель tun0
 
+> **tun0** — GRE-туннель до rtr-a, используется для OSPF-соседства между офисами
+
 ```bash
 mkdir -p /etc/net/ifaces/tun0
 ```
@@ -311,6 +314,8 @@ CONFIG_IPV4=yes
 ```
 
 ### rtr-a: туннель tun0
+
+> **tun0** — GRE-туннель до rtr-cod, используется для OSPF-соседства между офисами
 
 ```bash
 mkdir -p /etc/net/ifaces/tun0
@@ -359,15 +364,37 @@ ping -c 3 10.10.10.1
 
 ---
 
-## 5. Настройка NAT (masquerade)
+## 5. Настройка сетевого экрана (firewalld)
 
-### rtr-cod: NAT для выхода внутренних сетей в Интернет
-
-Статические маршруты к внутренним сетям COD (через fw-cod):
+### Включение firewalld (на обоих роутерах)
 
 ```bash
-mkdir -p /etc/net/ifaces/ens224
+systemctl enable --now firewalld
 ```
+
+### rtr-cod: зоны и NAT
+
+Внешний интерфейс (ISP) добавляем в зону **external** (masquerade включён по умолчанию), разрешаем GRE:
+
+```bash
+firewall-cmd --zone=external --add-interface=ens192 --permanent
+firewall-cmd --zone=external --add-protocol=gre --permanent
+```
+
+Все остальные интерфейсы добавляем в зону **trusted**:
+
+```bash
+firewall-cmd --zone=trusted --add-interface=ens224 --permanent
+firewall-cmd --zone=trusted --add-interface=tun0 --permanent
+```
+
+Применяем:
+
+```bash
+firewall-cmd --reload
+```
+
+Статические маршруты к внутренним сетям COD (через fw-cod).
 
 Добавьте в `/etc/net/ifaces/ens224/ipv4route`:
 
@@ -380,36 +407,27 @@ mkdir -p /etc/net/ifaces/ens224
 
 > Сеть 192.168.20.0/24 (VLAN DATA) **не маршрутизируется** по условиям задания.
 
-Правила NAT (iptables):
+### rtr-a: зоны и NAT
 
 ```bash
-iptables -t nat -A POSTROUTING -o ens192 -s 172.16.1.0/30 -j MASQUERADE
-iptables -t nat -A POSTROUTING -o ens192 -s 192.168.10.0/24 -j MASQUERADE
-iptables -t nat -A POSTROUTING -o ens192 -s 192.168.30.0/24 -j MASQUERADE
-iptables -t nat -A POSTROUTING -o ens192 -s 192.168.40.0/24 -j MASQUERADE
-iptables -t nat -A POSTROUTING -o ens192 -s 192.168.50.0/24 -j MASQUERADE
+firewall-cmd --zone=external --add-interface=ens192 --permanent
+firewall-cmd --zone=external --add-protocol=gre --permanent
+
+firewall-cmd --zone=trusted --add-interface=ens224 --permanent
+firewall-cmd --zone=trusted --add-interface=ens224.100 --permanent
+firewall-cmd --zone=trusted --add-interface=ens224.200 --permanent
+firewall-cmd --zone=trusted --add-interface=ens224.300 --permanent
+firewall-cmd --zone=trusted --add-interface=tun0 --permanent
+
+firewall-cmd --reload
 ```
 
-Для сохранения правил после перезагрузки:
+### Проверка firewalld
 
 ```bash
-iptables-save > /etc/sysconfig/iptables
-systemctl enable iptables
-```
-
-### rtr-a: NAT для выхода внутренних сетей в Интернет
-
-```bash
-iptables -t nat -A POSTROUTING -o ens192 -s 172.20.10.0/24 -j MASQUERADE
-iptables -t nat -A POSTROUTING -o ens192 -s 172.20.20.0/24 -j MASQUERADE
-iptables -t nat -A POSTROUTING -o ens192 -s 172.20.30.0/24 -j MASQUERADE
-```
-
-Сохранение:
-
-```bash
-iptables-save > /etc/sysconfig/iptables
-systemctl enable iptables
+firewall-cmd --get-active-zones
+firewall-cmd --zone=external --list-all
+firewall-cmd --zone=trusted --list-all
 ```
 
 ### Проверка NAT
@@ -533,15 +551,18 @@ configure terminal
 router ospf
  ospf router-id 10.10.10.1
  passive-interface default
- no passive-interface tun0
- network 10.10.10.0/30 area 0
- network 172.16.1.0/30 area 0
  redistribute static
 exit
 
 interface tun0
+ ip ospf area 0
+ no ip ospf passive
  ip ospf authentication message-digest
  ip ospf message-digest-key 1 md5 P@ssw0rd
+exit
+
+interface ens224
+ ip ospf area 0
 exit
 
 write memory
@@ -562,16 +583,25 @@ configure terminal
 router ospf
  ospf router-id 10.10.10.2
  passive-interface default
- no passive-interface tun0
- network 10.10.10.0/30 area 0
- network 172.20.10.0/24 area 0
- network 172.20.20.0/24 area 0
- network 172.20.30.0/24 area 0
 exit
 
 interface tun0
+ ip ospf area 0
+ no ip ospf passive
  ip ospf authentication message-digest
  ip ospf message-digest-key 1 md5 P@ssw0rd
+exit
+
+interface ens224.100
+ ip ospf area 0
+exit
+
+interface ens224.200
+ ip ospf area 0
+exit
+
+interface ens224.300
+ ip ospf area 0
 exit
 
 write memory
@@ -609,10 +639,10 @@ ping -c 3 172.16.1.1
 ```
 /etc/net/ifaces/
 ├── ens192/
-│   ├── options          # TYPE=eth, BOOTPROTO=static
+│   ├── options          # TYPE=eth
 │   └── ipv4address      # 178.207.179.4/29
 ├── ens224/
-│   ├── options          # TYPE=eth, BOOTPROTO=static
+│   ├── options          # TYPE=eth
 │   ├── ipv4address      # 172.16.1.1/30
 │   └── ipv4route        # статические маршруты к сетям COD
 └── tun0/
@@ -625,11 +655,11 @@ ping -c 3 172.16.1.1
 ```
 /etc/net/ifaces/
 ├── ens192/
-│   ├── options          # TYPE=eth, BOOTPROTO=static
+│   ├── options          # TYPE=eth
 │   ├── ipv4address      # 178.207.179.28/29
 │   └── ipv4route        # default via 178.207.179.25
 ├── ens224/
-│   └── options          # TYPE=eth, BOOTPROTO=static
+│   └── options          # TYPE=eth
 ├── ens224.100/
 │   ├── options          # TYPE=vlan, HOST=ens224, VID=100
 │   └── ipv4address      # 172.20.10.254/24

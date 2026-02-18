@@ -1,3 +1,5 @@
+> Физический порт fw-cod обращён в сторону **sw1-cod** (trunk). VLAN 200 (DATA) **не создаётся** — трафик не маршрутизируется
+
 ﻿# 9. Создание интерфейсов типа VLAN на fw-cod для маршутизации между VLAN
 
 ### Вариант реализации:
@@ -5,6 +7,9 @@
 #### 
 
 #### cli1-a (alt-workstation):
+
+> Физический порт fw-cod в сторону **sw1-cod** используется как транковый для VLAN 100, 300, 400, 500
+> VLAN 200 (DATA) **не создаётся** — трафик этого VLAN не маршрутизируется
 
 ##### Создание интерфейсов типа VLAN на fw-cod для маршутизации между VLAN
 
@@ -56,10 +61,14 @@
   + создав тегированный подинтерфейс с IP-адресом из подсети для **vlan300**
 
 ```bash
-ip link add link ens19 name ens19.300 type vlan id 300
-ip link set dev ens19 up
-ip link set dev ens19.300 up
-ip addr add 192.168.30.1/24 dev ens19.300
+ip link add link ens19 name ens19.300 type vlan id 300
+
+ip link set dev ens19 up
+
+ip link set dev ens19.300 up
+
+ip addr add 192.168.30.1/24 dev ens19.300
+
 ip route add 0.0.0.0/0 via 192.168.30.254
 ```
 
