@@ -85,6 +85,20 @@ TYPE=eth
 178.207.179.4/29
 ```
 
+Временный маршрут по умолчанию (будет удалён после настройки BGP) и DNS:
+
+`/etc/net/ifaces/ens192/ipv4route`:
+
+```
+default via 178.207.179.1
+```
+
+`/etc/net/ifaces/ens192/resolv.conf`:
+
+```
+nameserver 100.100.100.100
+```
+
 ### 1.4. Настройка интерфейса ens224
 
 > **ens224** — внутренний интерфейс, обращён в сторону машины **fw-cod**
@@ -105,34 +119,7 @@ TYPE=eth
 172.16.1.1/30
 ```
 
-Статические маршруты к внутренним сетям COD (через fw-cod).
-
-`/etc/net/ifaces/ens224/ipv4route`:
-
-```
-192.168.10.0/24 via 172.16.1.2
-192.168.30.0/24 via 172.16.1.2
-192.168.40.0/24 via 172.16.1.2
-192.168.50.0/24 via 172.16.1.2
-```
-
-> Сеть 192.168.20.0/24 (VLAN DATA) **не маршрутизируется** по условиям задания.
-
-### 1.5. Временный DNS и маршрут по умолчанию
-
-Для установки пакетов нужен доступ в Интернет. Маршрут по умолчанию rtr-cod получит по BGP позже, поэтому временно задаём его статически:
-
-```bash
-echo 'nameserver 100.100.100.100' > /etc/resolv.conf
-```
-
-`/etc/net/ifaces/ens192/ipv4route`:
-
-```
-default via 178.207.179.1
-```
-
-### 1.6. Применение и проверка
+### 1.5. Применение и проверка
 
 ```bash
 systemctl restart network
@@ -191,8 +178,10 @@ TYPE=eth
 default via 178.207.179.25
 ```
 
-```bash
-echo 'nameserver 100.100.100.100' > /etc/resolv.conf
+`/etc/net/ifaces/ens192/resolv.conf`:
+
+```
+nameserver 100.100.100.100
 ```
 
 ### 2.5. Настройка VLAN-интерфейсов на ens224
@@ -457,8 +446,6 @@ vtysh -c "show ip route"
 
 Убедитесь, что маршрут по умолчанию получен по BGP. После этого **удалите временный статический маршрут**:
 
-Удалите строку `default via 178.207.179.1` из файла `/etc/net/ifaces/ens192/ipv4route`:
-
 ```bash
 echo -n > /etc/net/ifaces/ens192/ipv4route
 ```
@@ -557,7 +544,7 @@ ping -c 3 172.16.1.1
 После того как OSPF заработает и появится связность с srv1-cod, замените временный DNS:
 
 ```bash
-echo 'nameserver <IP_srv1-cod>' > /etc/resolv.conf
+echo 'nameserver <IP_srv1-cod>' > /etc/net/ifaces/ens192/resolv.conf
 ```
 
 ---
@@ -682,11 +669,12 @@ ssh netuser@<IP_роутера>
 /etc/net/ifaces/
 ├── ens192/
 │   ├── options          # TYPE=eth
-│   └── ipv4address      # 178.207.179.4/29
+│   ├── ipv4address      # 178.207.179.4/29
+│   ├── ipv4route        # default убирается после настройки BGP
+│   └── resolv.conf      # DNS (временно 100.100.100.100, потом srv1-cod)
 ├── ens224/
 │   ├── options          # TYPE=eth
-│   ├── ipv4address      # 172.16.1.1/30
-│   └── ipv4route        # статические маршруты к сетям COD
+│   └── ipv4address      # 172.16.1.1/30
 └── tun0/
     ├── options          # TYPE=iptun, TUNTYPE=gre
     └── ipv4address      # 10.10.10.1/30
@@ -699,7 +687,8 @@ ssh netuser@<IP_роутера>
 ├── ens192/
 │   ├── options          # TYPE=eth
 │   ├── ipv4address      # 178.207.179.28/29
-│   └── ipv4route        # default via 178.207.179.25
+│   ├── ipv4route        # default via 178.207.179.25
+│   └── resolv.conf      # DNS (временно 100.100.100.100, потом srv1-cod)
 ├── ens224/
 │   └── options          # TYPE=eth
 ├── ens224.100/
